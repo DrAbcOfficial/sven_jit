@@ -1,0 +1,20 @@
+#include <cstring>
+
+#include <extdll.h>
+#include <dllapi.h>
+
+C_DLLEXPORT int GetEntityAPI2(
+    DLL_FUNCTIONS* functionTable,
+    int* interfaceVersion) {
+    if (!functionTable || !interfaceVersion) {
+        return FALSE;
+    }
+
+    if (*interfaceVersion != INTERFACE_VERSION) {
+        *interfaceVersion = INTERFACE_VERSION;
+        return FALSE;
+    }
+
+    std::memset(functionTable, 0, sizeof(*functionTable));
+    return TRUE;
+}

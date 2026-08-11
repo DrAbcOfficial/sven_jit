@@ -1,0 +1,6 @@
+[submodule "thirdparty/metamod"]
+	path = thirdparty/metamod
+	url = https://github.com/hzqst/metamod-fallguys
+[submodule "thirdparty/angelscript_jit_x86"]
+	path = thirdparty/angelscript_jit_x86
+	url = https://github.com/DrAbcOfficial/angelscript_jit_x86
