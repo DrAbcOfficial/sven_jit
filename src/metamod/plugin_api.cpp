@@ -13,9 +13,9 @@ mutil_funcs_t* gpMetaUtilFuncs = nullptr;
 plugin_info_t Plugin_info = {
     META_INTERFACE_VERSION,
     "Sven AngelScript JIT",
-    "1.0.0",
+    "0.0.1",
     "2026-08-11",
-    "sven_jit contributors",
+    "DrAbc",
     "",
     "SVEN_JIT",
     PT_STARTUP,
