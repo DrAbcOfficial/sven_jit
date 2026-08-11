@@ -1,0 +1,186 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  windows:
+    name: Windows x86
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Configure
+        run: cmake -S . -B build -A Win32
+
+      - name: Build
+        run: cmake --build build --config RelWithDebInfo --parallel
+
+      - name: Install
+        run: >-
+          cmake --install build
+          --config RelWithDebInfo
+          --prefix package/runtime/windows-x86
+
+      - name: Collect Windows symbols
+        shell: pwsh
+        run: |
+          $symbolRoot = Join-Path $PWD "package/symbols/windows-x86"
+          $pdbFile = "build/RelWithDebInfo/sven_jit.pdb"
+          if (-not (Test-Path -LiteralPath $pdbFile -PathType Leaf)) {
+              throw "Missing PDB file: $pdbFile"
+          }
+
+          New-Item -ItemType Directory -Force -Path $symbolRoot | Out-Null
+          Copy-Item -LiteralPath $pdbFile -Destination $symbolRoot
+
+      - name: Upload Windows files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-windows
+          path: package/runtime
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload Windows symbols
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: symbols-windows
+          path: package/symbols
+          if-no-files-found: error
+          retention-days: 1
+
+  linux:
+    name: Linux i386
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - name: Install i386 toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends binutils file gcc-multilib g++-multilib
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build
+          -DCMAKE_BUILD_TYPE=RelWithDebInfo
+          -DCMAKE_C_FLAGS=-m32
+          -DCMAKE_CXX_FLAGS=-m32
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Install
+        run: cmake --install build --prefix package/runtime/linux-i386
+
+      - name: Split Linux symbols
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          library="$(find package/runtime/linux-i386 -type f -name 'sven_jit.so' -print -quit)"
+          test -n "$library"
+
+          relative_path="${library#package/runtime/linux-i386/}"
+          symbol="package/symbols/linux-i386/${relative_path}.debug"
+          mkdir -p "$(dirname "$symbol")"
+
+          objcopy --only-keep-debug "$library" "$symbol"
+          strip --strip-unneeded "$library"
+          objcopy --add-gnu-debuglink="$PWD/$symbol" "$library"
+
+          file "$library" | grep -F "ELF 32-bit"
+
+      - name: Upload Linux files
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: runtime-linux
+          path: package/runtime
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload Linux symbols
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: symbols-linux
+          path: package/symbols
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    name: Publish release
+    needs:
+      - windows
+      - linux
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download runtime files
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: runtime-*
+          path: dist/runtime
+          merge-multiple: true
+
+      - name: Download symbols
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: symbols-*
+          path: dist/symbols
+          merge-multiple: true
+
+      - name: Create release archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          runtime_archive="sven_jit-${GITHUB_REF_NAME}.zip"
+          symbols_archive="sven_jit-${GITHUB_REF_NAME}-symbols.zip"
+
+          (cd dist/runtime && cmake -E tar cf "../../$runtime_archive" --format=zip -- .)
+          (cd dist/symbols && cmake -E tar cf "../../$symbols_archive" --format=zip -- .)
+
+          cmake -E tar tf "$runtime_archive"
+          cmake -E tar tf "$symbols_archive"
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          runtime_archive="sven_jit-${GITHUB_REF_NAME}.zip"
+          symbols_archive="sven_jit-${GITHUB_REF_NAME}-symbols.zip"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+              gh release upload "$GITHUB_REF_NAME" "$runtime_archive" "$symbols_archive" --clobber
+          else
+              gh release create "$GITHUB_REF_NAME" \
+                  "$runtime_archive" \
+                  "$symbols_archive" \
+                  --verify-tag \
+                  --generate-notes \
+                  --title "$GITHUB_REF_NAME"
+          fi
