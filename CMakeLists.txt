@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sven_jit VERSION 0.0.2 LANGUAGES C CXX)
+project(sven_jit VERSION 0.0.3 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -50,6 +50,7 @@ target_include_directories(sven_jit PRIVATE
 target_link_libraries(sven_jit PRIVATE as_jit_x86)
 
 target_compile_definitions(sven_jit PRIVATE
+    SVEN_JIT_VERSION="${PROJECT_VERSION}"
     $<$<PLATFORM_ID:Windows>:WIN32;_WINDOWS;_USRDLL;NOMINMAX;_CRT_SECURE_NO_WARNINGS>
     $<$<PLATFORM_ID:Linux>:linux;LINUX;_LINUX;PLATFORM_POSIX>
 )
