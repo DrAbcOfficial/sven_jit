@@ -20,6 +20,11 @@ cmake -S . -B build-win32 -A Win32
 cmake --build build-win32 --config Release
 ```
 
+SSE2 JIT code generation is enabled by default. Add
+`-DSVEN_JIT_ENABLE_AVX=ON` when configuring to build the SSE2+AVX variant.
+SSE2+AVX builds detect host support at runtime and fall back to SSE2 when
+needed.
+
 Linux:
 
 ```text

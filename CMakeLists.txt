@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
+option(SVEN_JIT_ENABLE_AVX "Enable AVX JIT code generation in addition to SSE2" OFF)
+
 if(NOT WIN32 AND NOT UNIX)
     message(FATAL_ERROR "sven_jit supports Windows and Linux only")
 endif()
@@ -24,6 +26,8 @@ endif()
 
 set(ASJITX86_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(ASJITX86_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASJITX86_ENABLE_SSE ON CACHE BOOL "" FORCE)
+set(ASJITX86_ENABLE_AVX ${SVEN_JIT_ENABLE_AVX} CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/angelscript_jit_x86 EXCLUDE_FROM_ALL)
 
 set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
