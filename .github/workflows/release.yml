@@ -22,10 +22,10 @@ jobs:
         include:
           - label: SSE2
             variant: sse
-            avx: "OFF"
-          - label: SSE2+AVX
-            variant: sse-avx
-            avx: "ON"
+            avx2: "OFF"
+          - label: SSE2+AVX2
+            variant: sse-avx2
+            avx2: "ON"
 
     steps:
       - name: Check out source
@@ -37,7 +37,7 @@ jobs:
       - name: Configure
         run: >-
           cmake -S . -B build -A Win32
-          -DSVEN_JIT_ENABLE_AVX=${{ matrix.avx }}
+          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.avx2 }}
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo --parallel
@@ -98,10 +98,10 @@ jobs:
         include:
           - label: SSE2
             variant: sse
-            avx: "OFF"
-          - label: SSE2+AVX
-            variant: sse-avx
-            avx: "ON"
+            avx2: "OFF"
+          - label: SSE2+AVX2
+            variant: sse-avx2
+            avx2: "ON"
 
     steps:
       - name: Check out source
@@ -121,7 +121,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_C_FLAGS=-m32
           -DCMAKE_CXX_FLAGS=-m32
-          -DSVEN_JIT_ENABLE_AVX=${{ matrix.avx }}
+          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.avx2 }}
 
       - name: Build
         run: cmake --build build --parallel

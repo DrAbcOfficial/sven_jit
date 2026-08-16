@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-option(SVEN_JIT_ENABLE_AVX "Enable AVX JIT code generation in addition to SSE2" OFF)
+option(SVEN_JIT_ENABLE_AVX2 "Enable the SSE2+AVX2 JIT variant" OFF)
 
 if(NOT WIN32 AND NOT UNIX)
     message(FATAL_ERROR "sven_jit supports Windows and Linux only")
@@ -27,7 +27,7 @@ endif()
 set(ASJITX86_BUILD_SHARED OFF CACHE BOOL "" FORCE)
 set(ASJITX86_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 set(ASJITX86_ENABLE_SSE ON CACHE BOOL "" FORCE)
-set(ASJITX86_ENABLE_AVX ${SVEN_JIT_ENABLE_AVX} CACHE BOOL "" FORCE)
+set(ASJITX86_ENABLE_AVX2 ${SVEN_JIT_ENABLE_AVX2} CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/angelscript_jit_x86 EXCLUDE_FROM_ALL)
 
 set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
@@ -39,6 +39,13 @@ add_library(sven_jit SHARED
     src/metamod/game_api.cpp
     src/metamod/plugin_api.cpp
 )
+
+if(MSVC)
+    target_compile_options(sven_jit PRIVATE /arch:IA32)
+elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(sven_jit PRIVATE
+        -mno-sse -mno-sse2 -mno-avx -mno-avx2)
+endif()
 
 target_include_directories(sven_jit PRIVATE
     src

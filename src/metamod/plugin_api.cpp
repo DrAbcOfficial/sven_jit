@@ -3,6 +3,8 @@
 #include <extdll.h>
 #include <meta_api.h>
 
+#include <as_jit_x86.h>
+
 #include "integration/asext_bridge.hpp"
 #include "jit/jit_service.hpp"
 
@@ -75,6 +77,12 @@ C_DLLEXPORT int Meta_Attach(
     meta_globals_t* metaGlobals,
     gamedll_funcs_t* gameFunctions) {
     if (!functionTable || !metaGlobals || !gameFunctions || !gpMetaUtilFuncs) {
+        return FALSE;
+    }
+
+    const char* compatibilityError = AsJitGetCompatibilityError();
+    if (compatibilityError) {
+        LOG_ERROR(PLID, "%s", compatibilityError);
         return FALSE;
     }
 
