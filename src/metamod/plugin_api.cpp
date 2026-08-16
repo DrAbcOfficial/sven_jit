@@ -66,6 +66,12 @@ C_DLLEXPORT int Meta_Query(
         return FALSE;
     }
 
+    const char* compatibilityError = AsJitGetCompatibilityError();
+    if (compatibilityError) {
+        utilities->pfnLogError(PLID, "%s", compatibilityError);
+        return FALSE;
+    }
+
     *pluginInfo = &Plugin_info;
     gpMetaUtilFuncs = utilities;
     return TRUE;
@@ -77,12 +83,6 @@ C_DLLEXPORT int Meta_Attach(
     meta_globals_t* metaGlobals,
     gamedll_funcs_t* gameFunctions) {
     if (!functionTable || !metaGlobals || !gameFunctions || !gpMetaUtilFuncs) {
-        return FALSE;
-    }
-
-    const char* compatibilityError = AsJitGetCompatibilityError();
-    if (compatibilityError) {
-        LOG_ERROR(PLID, "%s", compatibilityError);
         return FALSE;
     }
 
