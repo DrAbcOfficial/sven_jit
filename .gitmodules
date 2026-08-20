@@ -4,3 +4,6 @@
 [submodule "thirdparty/angelscript_jit_x86"]
 	path = thirdparty/angelscript_jit_x86
 	url = https://github.com/DrAbcOfficial/angelscript_jit_x86
+[submodule "thirdparty/metamod-p"]
+	path = thirdparty/metamod-p
+	url = https://github.com/Bots-United/metamod-p.git

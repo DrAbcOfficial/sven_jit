@@ -2,14 +2,15 @@
 
 ## Scope
 
-This repository contains the `sven_jit` Metamod plugin and two pinned
+This repository contains the `sven_jit` Metamod plugin and three pinned
 third-party submodules. Keep changes focused on the plugin, its build files,
 documentation, and the AngelScript JIT integration.
 
 ## Repository Layout
 
 - `src/` contains the plugin and AngelScript bridge.
-- `thirdparty/metamod/` contains the Metamod SDK and `asext` integration.
+- `thirdparty/metamod/` contains the metamod-fallguys SDK.
+- `thirdparty/metamod-p/` contains the metamod-p SDK.
 - `thirdparty/angelscript_jit_x86/` contains the pinned JIT submodule.
 - `CMakeLists.txt` controls the 32-bit SSE2 and optional AVX2 variants.
 
@@ -26,6 +27,8 @@ cmake --build build-win32 --config Release
 For the AVX2 variant, configure with
 `-DSVEN_JIT_ENABLE_AVX2=ON`. The resulting plugin requires AVX2 and does not
 fall back at runtime. Keep generated build directories out of commits.
+Configure with `-DSVEN_JIT_METAMOD=metamod-p` for metamod-p; the default is
+`metamod-fallguys`. Use separate build directories for the two SDK targets.
 
 Run JIT tests from a separate submodule build:
 

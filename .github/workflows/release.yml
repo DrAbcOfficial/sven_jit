@@ -14,12 +14,15 @@ concurrency:
 
 jobs:
   windows:
-    name: Windows x86 (${{ matrix.label }})
+    name: Windows x86 (${{ matrix.metamod }}, ${{ matrix.simd.label }})
     runs-on: windows-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
+        metamod:
+          - metamod-fallguys
+          - metamod-p
+        simd:
           - label: SSE2
             variant: sse
             avx2: "OFF"
@@ -37,7 +40,8 @@ jobs:
       - name: Configure
         run: >-
           cmake -S . -B build -A Win32
-          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.avx2 }}
+          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.simd.avx2 }}
+          -DSVEN_JIT_METAMOD=${{ matrix.metamod }}
 
       - name: Build
         run: cmake --build build --config RelWithDebInfo --parallel
@@ -46,12 +50,12 @@ jobs:
         run: >-
           cmake --install build
           --config RelWithDebInfo
-          --prefix package/runtime/windows-x86
+          --prefix package/runtime/windows-x86/${{ matrix.metamod }}
 
       - name: Collect Windows symbols
         shell: pwsh
         run: |
-          $symbolRoot = Join-Path $PWD "package/symbols/windows-x86"
+          $symbolRoot = Join-Path $PWD "package/symbols/windows-x86/${{ matrix.metamod }}"
           $pdbFile = "build/RelWithDebInfo/sven_jit.pdb"
           if (-not (Test-Path -LiteralPath $pdbFile -PathType Leaf)) {
               throw "Missing PDB file: $pdbFile"
@@ -63,18 +67,19 @@ jobs:
       - name: Create Windows archives
         shell: pwsh
         env:
-          SIMD_VARIANT: ${{ matrix.variant }}
+          METAMOD_VARIANT: ${{ matrix.metamod }}
+          SIMD_VARIANT: ${{ matrix.simd.variant }}
         run: |
           $dist = Join-Path $PWD "dist"
-          $runtimeArchive = Join-Path $dist "sven_jit-$env:GITHUB_REF_NAME-windows-x86-$env:SIMD_VARIANT.zip"
-          $symbolsArchive = Join-Path $dist "sven_jit-$env:GITHUB_REF_NAME-windows-x86-$env:SIMD_VARIANT-symbols.zip"
+          $runtimeArchive = Join-Path $dist "sven_jit-$env:GITHUB_REF_NAME-windows-x86-$env:METAMOD_VARIANT-$env:SIMD_VARIANT.zip"
+          $symbolsArchive = Join-Path $dist "sven_jit-$env:GITHUB_REF_NAME-windows-x86-$env:METAMOD_VARIANT-$env:SIMD_VARIANT-symbols.zip"
           New-Item -ItemType Directory -Force -Path $dist | Out-Null
 
-          Push-Location "package/runtime/windows-x86"
+          Push-Location "package/runtime/windows-x86/$env:METAMOD_VARIANT"
           cmake -E tar cf $runtimeArchive --format=zip -- .
           Pop-Location
 
-          Push-Location "package/symbols/windows-x86"
+          Push-Location "package/symbols/windows-x86/$env:METAMOD_VARIANT"
           cmake -E tar cf $symbolsArchive --format=zip -- .
           Pop-Location
 
@@ -84,18 +89,21 @@ jobs:
       - name: Upload Windows archives
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-windows-${{ matrix.variant }}
+          name: release-windows-${{ matrix.metamod }}-${{ matrix.simd.variant }}
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 1
 
   linux:
-    name: Linux i386 (${{ matrix.label }})
+    name: Linux i386 (${{ matrix.metamod }}, ${{ matrix.simd.label }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        include:
+        metamod:
+          - metamod-fallguys
+          - metamod-p
+        simd:
           - label: SSE2
             variant: sse
             avx2: "OFF"
@@ -121,24 +129,28 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo
           -DCMAKE_C_FLAGS=-m32
           -DCMAKE_CXX_FLAGS=-m32
-          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.avx2 }}
+          -DSVEN_JIT_ENABLE_AVX2=${{ matrix.simd.avx2 }}
+          -DSVEN_JIT_METAMOD=${{ matrix.metamod }}
 
       - name: Build
         run: cmake --build build --parallel
 
       - name: Install
-        run: cmake --install build --prefix package/runtime/linux-i386
+        run: >-
+          cmake --install build
+          --prefix package/runtime/linux-i386/${{ matrix.metamod }}
 
       - name: Split Linux symbols
         shell: bash
         run: |
           set -euo pipefail
 
-          library="$(find package/runtime/linux-i386 -type f -name 'sven_jit.so' -print -quit)"
+          metamod="${{ matrix.metamod }}"
+          library="$(find "package/runtime/linux-i386/$metamod" -type f -name 'sven_jit.so' -print -quit)"
           test -n "$library"
 
-          relative_path="${library#package/runtime/linux-i386/}"
-          symbol="package/symbols/linux-i386/${relative_path}.debug"
+          relative_path="${library#package/runtime/linux-i386/$metamod/}"
+          symbol="package/symbols/linux-i386/$metamod/${relative_path}.debug"
           mkdir -p "$(dirname "$symbol")"
 
           objcopy --only-keep-debug "$library" "$symbol"
@@ -150,16 +162,17 @@ jobs:
       - name: Create Linux archives
         shell: bash
         env:
-          SIMD_VARIANT: ${{ matrix.variant }}
+          METAMOD_VARIANT: ${{ matrix.metamod }}
+          SIMD_VARIANT: ${{ matrix.simd.variant }}
         run: |
           set -euo pipefail
 
           mkdir -p dist
-          runtime_archive="$PWD/dist/sven_jit-${GITHUB_REF_NAME}-linux-i386-${SIMD_VARIANT}.zip"
-          symbols_archive="$PWD/dist/sven_jit-${GITHUB_REF_NAME}-linux-i386-${SIMD_VARIANT}-symbols.zip"
+          runtime_archive="$PWD/dist/sven_jit-${GITHUB_REF_NAME}-linux-i386-${METAMOD_VARIANT}-${SIMD_VARIANT}.zip"
+          symbols_archive="$PWD/dist/sven_jit-${GITHUB_REF_NAME}-linux-i386-${METAMOD_VARIANT}-${SIMD_VARIANT}-symbols.zip"
 
-          (cd package/runtime/linux-i386 && cmake -E tar cf "$runtime_archive" --format=zip -- .)
-          (cd package/symbols/linux-i386 && cmake -E tar cf "$symbols_archive" --format=zip -- .)
+          (cd "package/runtime/linux-i386/$METAMOD_VARIANT" && cmake -E tar cf "$runtime_archive" --format=zip -- .)
+          (cd "package/symbols/linux-i386/$METAMOD_VARIANT" && cmake -E tar cf "$symbols_archive" --format=zip -- .)
 
           cmake -E tar tf "$runtime_archive"
           cmake -E tar tf "$symbols_archive"
@@ -167,7 +180,7 @@ jobs:
       - name: Upload Linux archives
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: release-linux-${{ matrix.variant }}
+          name: release-linux-${{ matrix.metamod }}-${{ matrix.simd.variant }}
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 1
@@ -194,7 +207,7 @@ jobs:
         run: |
           set -euo pipefail
           mapfile -t archives < <(find dist -maxdepth 1 -type f -name '*.zip' -print | sort)
-          test "${#archives[@]}" -eq 8
+          test "${#archives[@]}" -eq 16
           printf '%s\n' "${archives[@]}"
 
       - name: Publish GitHub release

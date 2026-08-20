@@ -1,14 +1,18 @@
 #include "integration/game_engine_bridge.hpp"
 
+#include <extdll.h>
+#ifdef SVEN_JIT_METAMOD_P
+#undef min
+#undef max
+#endif
+#include <dllapi.h>
+#include <meta_api.h>
+
 #include <array>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <vector>
-
-#include <extdll.h>
-#include <dllapi.h>
-#include <meta_api.h>
 
 #ifdef _WIN32
 #include <Windows.h>

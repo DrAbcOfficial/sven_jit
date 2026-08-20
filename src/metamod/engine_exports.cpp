@@ -1,7 +1,11 @@
-#include <cstring>
-
 #include <extdll.h>
+#ifdef SVEN_JIT_METAMOD_P
+#undef min
+#undef max
+#endif
 #include <meta_api.h>
+
+#include <cstring>
 
 enginefuncs_t g_engfuncs{};
 globalvars_t* gpGlobals = nullptr;

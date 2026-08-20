@@ -8,6 +8,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(SVEN_JIT_ENABLE_AVX2 "Enable the SSE2+AVX2 JIT variant" OFF)
+set(SVEN_JIT_METAMOD "metamod-fallguys" CACHE STRING
+    "Metamod SDK compatibility target (metamod-fallguys or metamod-p)")
+set_property(CACHE SVEN_JIT_METAMOD PROPERTY STRINGS
+    metamod-fallguys
+    metamod-p)
 
 if(NOT WIN32 AND NOT UNIX)
     message(FATAL_ERROR "sven_jit supports Windows and Linux only")
@@ -30,7 +35,23 @@ set(ASJITX86_ENABLE_SSE ON CACHE BOOL "" FORCE)
 set(ASJITX86_ENABLE_AVX2 ${SVEN_JIT_ENABLE_AVX2} CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/angelscript_jit_x86 EXCLUDE_FROM_ALL)
 
-set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
+if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+    set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
+elseif(SVEN_JIT_METAMOD STREQUAL "metamod-p")
+    set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod-p")
+else()
+    message(FATAL_ERROR
+        "Unsupported SVEN_JIT_METAMOD value: ${SVEN_JIT_METAMOD}. "
+        "Expected metamod-fallguys or metamod-p.")
+endif()
+
+if(NOT EXISTS "${METAMOD_ROOT}/metamod/meta_api.h")
+    message(FATAL_ERROR
+        "The ${SVEN_JIT_METAMOD} SDK is unavailable at ${METAMOD_ROOT}. "
+        "Initialize the repository submodules before configuring.")
+endif()
+
+message(STATUS "Configuring sven_jit for ${SVEN_JIT_METAMOD}")
 
 add_library(sven_jit SHARED
     src/integration/game_engine_bridge.cpp
@@ -54,7 +75,7 @@ target_include_directories(sven_jit PRIVATE
     "${METAMOD_ROOT}/hlsdk/engine"
     "${METAMOD_ROOT}/hlsdk/pm_shared"
     "${METAMOD_ROOT}/metamod"
-    "${METAMOD_ROOT}/thirdparty/angelscript-sdk/angelscript/include"
+    "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/angelscript_jit_x86/third_party/angelscript/sdk/angelscript/include"
 )
 
 target_link_libraries(sven_jit PRIVATE as_jit_x86 ${CMAKE_DL_LIBS})
@@ -64,6 +85,13 @@ target_compile_definitions(sven_jit PRIVATE
     $<$<PLATFORM_ID:Windows>:WIN32;_WINDOWS;_USRDLL;NOMINMAX;_CRT_SECURE_NO_WARNINGS>
     $<$<PLATFORM_ID:Linux>:linux;LINUX;_LINUX;PLATFORM_POSIX>
 )
+
+if(SVEN_JIT_METAMOD STREQUAL "metamod-p")
+    target_compile_definitions(sven_jit PRIVATE
+        SVEN_JIT_METAMOD_P=1
+        min=SVEN_JIT_LEGACY_MIN_MACRO
+        max=SVEN_JIT_LEGACY_MAX_MACRO)
+endif()
 
 set_target_properties(sven_jit PROPERTIES
     PREFIX ""

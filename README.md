@@ -12,11 +12,17 @@ runtime does not require the `asext` plugin or a hard-coded GameDLL module name.
 - CMake 3.24 or newer
 - A C++20 compiler with 32-bit x86 support
 - A Sven Co-op Dedicated Server installation
-- The recursive `metamod-fallguys` and `angelscript_jit_x86` submodules
+- The recursive `metamod-fallguys`, `metamod-p`, and `angelscript_jit_x86`
+  submodules
 
 Only the Metamod SDK headers are used at build time. At runtime, engine
 discovery does not use Metamod's version-specific binary-analysis or
 inline-hook extensions.
+
+The build must target the Metamod implementation installed on the server.
+`SVEN_JIT_METAMOD` accepts `metamod-fallguys` (the default) or `metamod-p`.
+Each output uses the selected SDK's exact `META_INTERFACE_VERSION`, so the two
+outputs are distributed separately and are not interchangeable.
 
 The default build uses the SSE2 JIT path and requires SSE2 at runtime. The
 optional AVX2 build uses packed SSE2/AVX2 code and requires CPU and operating
@@ -50,6 +56,15 @@ cmake -S . -B build-win32 -A Win32
 cmake --build build-win32 --config Release
 ```
 
+The command above targets metamod-fallguys. To build for metamod-p, use a
+separate build directory:
+
+```text
+cmake -S . -B build-win32-metamod-p -A Win32 \
+  -DSVEN_JIT_METAMOD=metamod-p
+cmake --build build-win32-metamod-p --config Release
+```
+
 Build the AVX2 variant separately when all target servers support AVX2:
 
 ```text
@@ -69,8 +84,10 @@ cmake -S . -B build-linux32 \
 cmake --build build-linux32 -j
 ```
 
-Add `-DSVEN_JIT_ENABLE_AVX2=ON` to configure an AVX2 build. CMake rejects
-64-bit configurations.
+Add `-DSVEN_JIT_METAMOD=metamod-p` to target metamod-p, or leave the option at
+its default value to target metamod-fallguys. Add `-DSVEN_JIT_ENABLE_AVX2=ON`
+to configure an AVX2 build. Use separate build directories for every Metamod
+and instruction-set combination. CMake rejects 64-bit configurations.
 
 ## Test
 
@@ -96,6 +113,10 @@ Copy the matching output to `svencoop/addons/metamod/dlls`:
 
 - Windows: `sven_jit.dll`
 - Linux: `sven_jit.so`
+
+Release archive names identify both the Metamod target (`metamod-p` or
+`metamod-fallguys`) and the instruction-set variant (`sse` or `sse-avx2`).
+Install the archive matching the server's Metamod implementation.
 
 Register the plugin in `svencoop/addons/metamod/plugins.ini`:
 

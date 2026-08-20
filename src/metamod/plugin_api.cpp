@@ -1,7 +1,11 @@
-#include <cstring>
-
 #include <extdll.h>
+#ifdef SVEN_JIT_METAMOD_P
+#undef min
+#undef max
+#endif
 #include <meta_api.h>
+
+#include <cstring>
 
 #include <as_jit_x86.h>
 
@@ -12,32 +16,33 @@ meta_globals_t* gpMetaGlobals = nullptr;
 gamedll_funcs_t* gpGamedllFuncs = nullptr;
 mutil_funcs_t* gpMetaUtilFuncs = nullptr;
 
+char g_pluginInterfaceVersion[] = META_INTERFACE_VERSION;
+char g_pluginName[] = "Sven AngelScript JIT";
+char g_pluginVersion[] = SVEN_JIT_VERSION;
+char g_pluginDate[] = "2026-08-11";
+char g_pluginAuthor[] = "DrAbc";
+char g_pluginUrl[] = "";
+char g_pluginLogTag[] = "SVEN_JIT";
+
 plugin_info_t Plugin_info = {
-    META_INTERFACE_VERSION,
-    "Sven AngelScript JIT",
-    SVEN_JIT_VERSION,
-    "2026-08-11",
-    "DrAbc",
-    "",
-    "SVEN_JIT",
+    g_pluginInterfaceVersion,
+    g_pluginName,
+    g_pluginVersion,
+    g_pluginDate,
+    g_pluginAuthor,
+    g_pluginUrl,
+    g_pluginLogTag,
     PT_STARTUP,
     PT_NEVER,
 };
 
 namespace {
 
-META_FUNCTIONS g_metaFunctions = {
-    nullptr,
-    nullptr,
-    GetEntityAPI2,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-    nullptr,
-};
+META_FUNCTIONS g_metaFunctions = [] {
+    META_FUNCTIONS functions{};
+    functions.pfnGetEntityAPI2 = GetEntityAPI2;
+    return functions;
+}();
 
 void OnEngineReady(asIScriptEngine* engine) noexcept {
     if (svenjit::jit::Install(engine)) {
@@ -50,7 +55,11 @@ void OnEngineReady(asIScriptEngine* engine) noexcept {
 }
 
 C_DLLEXPORT int Meta_Query(
+#ifdef SVEN_JIT_METAMOD_P
+    char* interfaceVersion,
+#else
     const char* interfaceVersion,
+#endif
     plugin_info_t** pluginInfo,
     mutil_funcs_t* utilities) {
     if (!interfaceVersion || !pluginInfo || !utilities) {
