@@ -5,7 +5,7 @@
 
 #include <as_jit_x86.h>
 
-#include "integration/asext_bridge.hpp"
+#include "integration/game_engine_bridge.hpp"
 #include "jit/jit_service.hpp"
 
 meta_globals_t* gpMetaGlobals = nullptr;
@@ -90,9 +90,8 @@ C_DLLEXPORT int Meta_Attach(
     gpGamedllFuncs = gameFunctions;
     std::memcpy(functionTable, &g_metaFunctions, sizeof(g_metaFunctions));
 
-    const char* error = svenjit::integration::ConnectAsext(
-        gpMetaUtilFuncs,
-        PLID,
+    const char* error = svenjit::integration::ConnectGameEngine(
+        gpGamedllFuncs,
         &OnEngineReady);
     if (error) {
         LOG_ERROR(PLID, "%s", error);
@@ -103,5 +102,6 @@ C_DLLEXPORT int Meta_Attach(
 }
 
 C_DLLEXPORT int Meta_Detach(PLUG_LOADTIME, PL_UNLOAD_REASON) {
+    svenjit::integration::DisconnectGameEngine();
     return TRUE;
 }

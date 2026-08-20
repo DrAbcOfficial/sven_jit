@@ -6,9 +6,10 @@ namespace svenjit::integration {
 
 using EngineReadyCallback = void (*)(asIScriptEngine*) noexcept;
 
-const char* ConnectAsext(
-    void* utilities,
-    void* plugin,
+const char* ConnectGameEngine(
+    void* gameFunctions,
     EngineReadyCallback callback) noexcept;
+
+void DisconnectGameEngine() noexcept;
 
 }

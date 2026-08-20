@@ -3,7 +3,9 @@
 `sven_jit` is a 32-bit x86 Metamod plugin for Sven Co-op Dedicated Server. It
 connects Sven Co-op's AngelScript engine to the bundled
 [`angelscript_jit_x86`](https://github.com/DrAbcOfficial/angelscript_jit_x86)
-runtime before script modules are compiled.
+runtime before script modules are compiled. It discovers the loaded GameDLL
+from its function table and hooks AngelScript initialization directly; the
+runtime does not require the `asext` plugin or a hard-coded GameDLL module name.
 
 ## Requirements
 
@@ -11,6 +13,10 @@ runtime before script modules are compiled.
 - A C++20 compiler with 32-bit x86 support
 - A Sven Co-op Dedicated Server installation
 - The recursive `metamod-fallguys` and `angelscript_jit_x86` submodules
+
+Only the Metamod SDK headers are used at build time. At runtime, engine
+discovery does not use Metamod's version-specific binary-analysis or
+inline-hook extensions.
 
 The default build uses the SSE2 JIT path and requires SSE2 at runtime. The
 optional AVX2 build uses packed SSE2/AVX2 code and requires CPU and operating

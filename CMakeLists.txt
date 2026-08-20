@@ -33,7 +33,7 @@ add_subdirectory(thirdparty/angelscript_jit_x86 EXCLUDE_FROM_ALL)
 set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
 
 add_library(sven_jit SHARED
-    src/integration/asext_bridge.cpp
+    src/integration/game_engine_bridge.cpp
     src/jit/jit_service.cpp
     src/metamod/engine_exports.cpp
     src/metamod/game_api.cpp
@@ -49,7 +49,6 @@ endif()
 
 target_include_directories(sven_jit PRIVATE
     src
-    "${METAMOD_ROOT}/asext/include"
     "${METAMOD_ROOT}/hlsdk/common"
     "${METAMOD_ROOT}/hlsdk/dlls"
     "${METAMOD_ROOT}/hlsdk/engine"
@@ -58,7 +57,7 @@ target_include_directories(sven_jit PRIVATE
     "${METAMOD_ROOT}/thirdparty/angelscript-sdk/angelscript/include"
 )
 
-target_link_libraries(sven_jit PRIVATE as_jit_x86)
+target_link_libraries(sven_jit PRIVATE as_jit_x86 ${CMAKE_DL_LIBS})
 
 target_compile_definitions(sven_jit PRIVATE
     SVEN_JIT_VERSION="${PROJECT_VERSION}"
