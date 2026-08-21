@@ -1,12 +1,6 @@
 #include "integration/game_engine_bridge.hpp"
 
-#include <extdll.h>
-#ifdef SVEN_JIT_METAMOD_P
-#undef min
-#undef max
-#endif
-#include <dllapi.h>
-#include <meta_api.h>
+#include "metamod/hlsdk.hpp"
 
 #include <array>
 #include <cstddef>
@@ -257,13 +251,29 @@ void RemoveCallPatches() noexcept {
 }
 
 asIScriptEngine* GetScriptEngine() noexcept {
-    if (!g_serverManager || !*g_serverManager) {
+    CASServerManager* serverManager = g_serverManager ? *g_serverManager : nullptr;
+    if (!serverManager) {
         return nullptr;
     }
-    auto* manager = reinterpret_cast<std::uint8_t*>(*g_serverManager);
+    auto* manager = reinterpret_cast<std::uint8_t*>(serverManager);
     asIScriptEngine* engine = nullptr;
     std::memcpy(&engine, manager + kServerManagerEngineOffset, sizeof(engine));
     return engine;
+}
+
+bool NotifyEngineReady() noexcept {
+    if (!g_engineReadyCallback) {
+        return true;
+    }
+    asIScriptEngine* engine = GetScriptEngine();
+    if (!engine) {
+        return false;
+    }
+    EngineReadyCallback callback = g_engineReadyCallback;
+    g_engineReadyCallback = nullptr;
+    RemoveCallPatches();
+    callback(engine);
+    return true;
 }
 
 bool IsDocumentationReadyMarker(
@@ -285,12 +295,7 @@ int SC_SERVER_DECL HookedRegisterObjectType(
     int size,
     unsigned int flags) {
     if (g_engineReadyCallback && IsDocumentationReadyMarker(docs, name, flags)) {
-        if (asIScriptEngine* engine = GetScriptEngine()) {
-            EngineReadyCallback callback = g_engineReadyCallback;
-            g_engineReadyCallback = nullptr;
-            RemoveCallPatches();
-            callback(engine);
-        }
+        NotifyEngineReady();
     }
 
     return g_registerObjectType(
@@ -480,27 +485,23 @@ std::vector<std::uint8_t*> FindDirectCallsTo(
     return calls;
 }
 
-bool LocateRegisterObjectTypeCalls(
+bool LocateRegisterObjectType(
     const ModuleView& module
 #ifndef _WIN32
     , const char* modulePath
 #endif
-    , std::vector<std::uint8_t*>& calls) {
+) {
     const auto signatureMatches = FindPattern(
         module,
         kRegisterObjectTypeSignature,
         sizeof(kRegisterObjectTypeSignature));
-    if (signatureMatches.size() == 1) {
+    if (!signatureMatches.empty()) {
         std::uint8_t* call =
             signatureMatches.front() + sizeof(kRegisterObjectTypeSignature) - 1;
         g_registerObjectType = reinterpret_cast<RegisterObjectTypeFn>(
             ResolveRelativeCall(call));
-        if (!g_registerObjectType || !module.ContainsExecutable(
-                reinterpret_cast<void*>(g_registerObjectType))) {
-            return false;
-        }
-        calls.push_back(call);
-        return true;
+        return g_registerObjectType && module.ContainsExecutable(
+            reinterpret_cast<void*>(g_registerObjectType));
     }
 
 #ifndef _WIN32
@@ -510,10 +511,7 @@ bool LocateRegisterObjectTypeCalls(
             reinterpret_cast<void*>(g_registerObjectType))) {
         return false;
     }
-    calls = FindDirectCallsTo(
-        module,
-        reinterpret_cast<void*>(g_registerObjectType));
-    return !calls.empty();
+    return true;
 #else
     return false;
 #endif
@@ -575,20 +573,26 @@ const char* ConnectGameEngine(
         return nullptr;
     }
 
-    std::vector<std::uint8_t*> calls;
-    if (!LocateRegisterObjectTypeCalls(
+    if (!LocateRegisterObjectType(
             module
 #ifndef _WIN32
             , modulePath
 #endif
-            , calls)) {
+            )) {
         g_engineReadyCallback = nullptr;
-        return "failed to locate the AngelScript initialization call";
+        return "failed to locate the AngelScript registration function";
     }
 
+    const std::vector<std::uint8_t*> calls = FindDirectCallsTo(
+        module,
+        reinterpret_cast<void*>(g_registerObjectType));
+    if (calls.empty()) {
+        g_engineReadyCallback = nullptr;
+        return "failed to locate calls to the AngelScript registration function";
+    }
     if (!InstallCallPatches(calls)) {
         g_engineReadyCallback = nullptr;
-        return "failed to hook the AngelScript initialization call";
+        return "failed to hook the AngelScript registration function";
     }
     return nullptr;
 }

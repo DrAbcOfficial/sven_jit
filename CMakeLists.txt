@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sven_jit VERSION 0.0.4 LANGUAGES C CXX)
+project(sven_jit VERSION 0.1.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -61,6 +61,11 @@ add_library(sven_jit SHARED
     src/metamod/plugin_api.cpp
 )
 
+if(WIN32)
+    target_sources(sven_jit PRIVATE
+        src/metamod/sven_jit.def)
+endif()
+
 if(MSVC)
     target_compile_options(sven_jit PRIVATE /arch:IA32)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -88,9 +93,7 @@ target_compile_definitions(sven_jit PRIVATE
 
 if(SVEN_JIT_METAMOD STREQUAL "metamod-p")
     target_compile_definitions(sven_jit PRIVATE
-        SVEN_JIT_METAMOD_P=1
-        min=SVEN_JIT_LEGACY_MIN_MACRO
-        max=SVEN_JIT_LEGACY_MAX_MACRO)
+        SVEN_JIT_METAMOD_P=1)
 endif()
 
 set_target_properties(sven_jit PROPERTIES

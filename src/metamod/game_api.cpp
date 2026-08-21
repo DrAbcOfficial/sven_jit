@@ -1,9 +1,4 @@
-#include <extdll.h>
-#ifdef SVEN_JIT_METAMOD_P
-#undef min
-#undef max
-#endif
-#include <dllapi.h>
+#include "metamod/hlsdk.hpp"
 
 #include <cstring>
 

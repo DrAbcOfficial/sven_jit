@@ -1,16 +1,16 @@
-#include <extdll.h>
-#ifdef SVEN_JIT_METAMOD_P
-#undef min
-#undef max
-#endif
-#include <meta_api.h>
+#include "metamod/hlsdk.hpp"
 
 #include <cstring>
 
 enginefuncs_t g_engfuncs{};
 globalvars_t* gpGlobals = nullptr;
 
-C_DLLEXPORT void WINAPI GiveFnptrsToDll(
+#ifdef _WIN32
+extern "C"
+#else
+C_DLLEXPORT
+#endif
+void WINAPI GiveFnptrsToDll(
     enginefuncs_t* engineFunctions,
     globalvars_t* globals) {
     if (engineFunctions) {
