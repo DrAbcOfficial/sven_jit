@@ -49,6 +49,13 @@ the newest tested commit from `origin/master` whenever the JIT is updated.
 
 ### Windows
 
+> [!WARNING]
+> Do not mix Debug and Release binaries. In particular, never load a Debug
+> build of `sven_jit` into the Release Sven Co-op Dedicated Server. The JIT
+> operates directly on AngelScript objects allocated by the server, so mixing
+> the Debug and Release MSVC runtimes can cause heap corruption. Use
+> `RelWithDebInfo` when source-level debugging and PDB symbols are required.
+
 Configure and build the default SSE2 binary:
 
 ```text
