@@ -1,36 +1,38 @@
-# Agent and Contributor Guide
+# sven_jit
 
-## Scope
+32-bit Metamod plugin. Hooks the GameDLL (signature/symbol scan of `CASDocumentation::RegisterObjectType` / `CASServerManager`), then installs the JIT. No `asext`. Plugin is `PT_STARTUP` / `PT_NEVER`; AngelScript keeps the JIT for process life — `AsJitDestroyEngine` is never called.
 
-This repository contains the `sven_jit` Metamod plugin and three pinned
-third-party submodules. Keep changes focused on the plugin, its build files,
-documentation, and the AngelScript JIT integration.
+## Layout
 
-## Repository Layout
+- `src/` — plugin only (`metamod/`, `integration/`, `jit/`).
+- `thirdparty/metamod/` — metamod-fallguys (default).
+- `thirdparty/metamod-p/` — metamod-p.
+- `thirdparty/angelscript_jit_x86/` — pinned JIT submodule. Do not vendor a second copy or commit files inside it.
 
-- `src/` contains the plugin and AngelScript bridge.
-- `thirdparty/metamod/` contains the metamod-fallguys SDK.
-- `thirdparty/metamod-p/` contains the metamod-p SDK.
-- `thirdparty/angelscript_jit_x86/` contains the pinned JIT submodule.
-- `CMakeLists.txt` controls the 32-bit SSE2 and optional AVX2 variants.
+Headers only from the Metamod SDKs. Do not treat `thirdparty/metamod/CLAUDE.md` as this plugin's guide.
 
-## Build and Test
+## Build
 
-Use a 32-bit toolchain and CMake 3.24 or newer. Configure a fresh build
-directory for each instruction-set variant:
+CMake 3.24+, C++20, 32-bit toolchain. Separate build dirs per Metamod × SIMD combo.
 
 ```text
 cmake -S . -B build-win32 -A Win32
 cmake --build build-win32 --config Release
 ```
 
-For the AVX2 variant, configure with
-`-DSVEN_JIT_ENABLE_AVX2=ON`. The resulting plugin requires AVX2 and does not
-fall back at runtime. Keep generated build directories out of commits.
-Configure with `-DSVEN_JIT_METAMOD=metamod-p` for metamod-p; the default is
-`metamod-fallguys`. Use separate build directories for the two SDK targets.
+- `-DSVEN_JIT_METAMOD=metamod-p` (default `metamod-fallguys`). Outputs are not interchangeable (`META_INTERFACE_VERSION`).
+- `-DSVEN_JIT_ENABLE_AVX2=ON` — no runtime fallback; host must have AVX2.
+- Linux: `-DCMAKE_C_FLAGS=-m32 -DCMAKE_CXX_FLAGS=-m32` (and `g++-multilib`).
+- CMake forces the JIT static, tests off, SSE on, AVX2 from `SVEN_JIT_ENABLE_AVX2`.
+- Plugin/JIT C++ is compiled `/arch:IA32` / `-mno-sse`; SIMD exists only in asmjit-generated code.
 
-Run JIT tests from a separate submodule build:
+Never load a Debug `sven_jit` into a Release server. Use `RelWithDebInfo` for debugging. Release tags `v*` build RelWithDebInfo.
+
+Windows stdcall export: `src/metamod/sven_jit.def` (`GiveFnptrsToDll`). GameDLL thiscall is hooked as `__fastcall` plus a dummy `int`. `hlsdk.hpp` undefs `_DEBUG` around metamod-p headers.
+
+## Tests
+
+No plugin unit tests. Run the JIT suite from a **separate** tree (do not enable tests in the plugin configure):
 
 ```text
 cmake -S thirdparty/angelscript_jit_x86 -B build-jit-tests -A Win32 \
@@ -39,33 +41,15 @@ cmake --build build-jit-tests --config Release
 ctest --test-dir build-jit-tests -C Release --output-on-failure
 ```
 
-## Submodule Policy
+Add `-DASJITX86_ENABLE_AVX2=ON` and another build dir when SIMD emit changes.
 
-`thirdparty/angelscript_jit_x86` must always point to the latest tested commit
-on `origin/master` of the JIT repository. After changing the JIT:
+## Submodule
 
-1. Commit and push the JIT repository first.
-2. Update the submodule checkout to that commit.
-3. Commit the changed gitlink in `sven_jit`.
-4. Push `sven_jit` only after the gitlink resolves from the remote.
+`thirdparty/angelscript_jit_x86` must track the latest tested `origin/master` of the JIT repo. Push JIT first, then the gitlink. `git submodule status` should resolve.
 
-Do not vendor a second copy of the JIT or commit files inside the submodule.
+## Conventions
 
-## Coding Practices
-
-- Preserve 32-bit x86 compatibility and C++20 support.
-- Keep CPU feature checks consistent with emitted instructions.
-- Maintain interpreter/JIT result parity; add or extend consistency scripts for
-  behavioral changes.
-- Keep SSE2 and AVX2 code paths explicit and preserve the scalar fallback where
-  it is required for compatibility.
-- Match the existing formatting and avoid unrelated refactors.
-
-## Commit and Review Checklist
-
-- Run the default SSE2 tests and, when SIMD code changes, the AVX2 tests.
-- Run `git diff --check` in both repositories.
-- Confirm `git submodule status` resolves to the newest pushed JIT commit.
-- Use a short imperative commit subject describing the change.
-- Push both repositories after their respective commits; do not leave a dirty
-  submodule or an uncommitted gitlink update.
+- Interpreter/JIT result parity; extend `tests/scripts` + the list in `jit_consistency.cpp` (in the JIT repo) for behavioral changes.
+- Keep SSE2 vs AVX2 paths explicit.
+- `Meta_Query` takes `char*` on metamod-p, `const char*` on fallguys.
+- Engine-ready marker is `RegisterObjectType` of `CSurvivalMode` / `"Survival Mode handler"` / flags `0x40001`.
