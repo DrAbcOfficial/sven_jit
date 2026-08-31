@@ -67,10 +67,19 @@ if(WIN32)
 endif()
 
 if(MSVC)
-    target_compile_options(sven_jit PRIVATE /arch:IA32)
+    target_compile_options(sven_jit PRIVATE
+        /arch:IA32
+        /Gy
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/GS->
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/Oi>
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/Oy>
+        $<$<CONFIG:Release,RelWithDebInfo,MinSizeRel>:/Gw>)
 elseif(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     target_compile_options(sven_jit PRIVATE
-        -mno-sse -mno-sse2 -mno-avx -mno-avx2)
+        -mno-sse -mno-sse2 -mno-avx -mno-avx2
+        -fno-semantic-interposition
+        -ffunction-sections
+        -fdata-sections)
 endif()
 
 target_include_directories(sven_jit PRIVATE
