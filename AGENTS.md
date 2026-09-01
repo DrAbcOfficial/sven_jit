@@ -1,15 +1,20 @@
 # sven_jit
 
-32-bit Metamod plugin. Hooks the GameDLL (signature/symbol scan of `CASDocumentation::RegisterObjectType` / `CASServerManager`), then installs the JIT. No `asext`. Plugin is `PT_STARTUP` / `PT_NEVER`; AngelScript keeps the JIT for process life — `AsJitDestroyEngine` is never called.
+32-bit Metamod plugin. Plugin is `PT_STARTUP` / `PT_NEVER`; AngelScript keeps the JIT for process life — `AsJitDestroyEngine` is never called.
+
+- metamod-fallguys: loads `asext` (`LOAD_PLUGIN`) and installs the JIT from `ASEXT_RegisterDocInitCallback` / `ASEXT_GetServerManager`.
+- metamod-p: hooks the GameDLL (signature/symbol scan of `CASDocumentation::RegisterObjectType` / `CASServerManager`).
 
 ## Layout
 
 - `src/` — plugin only (`metamod/`, `integration/`, `jit/`).
+- `src/integration/asext_engine_bridge.cpp` — fallguys + asext.
+- `src/integration/game_engine_bridge.cpp` — metamod-p signature scan.
 - `thirdparty/metamod/` — metamod-fallguys (default).
 - `thirdparty/metamod-p/` — metamod-p.
 - `thirdparty/angelscript_jit_x86/` — pinned JIT submodule. Do not vendor a second copy or commit files inside it.
 
-Headers only from the Metamod SDKs. Do not treat `thirdparty/metamod/CLAUDE.md` as this plugin's guide.
+Headers from the Metamod SDKs. Fallguys also includes `asext/include`. Do not treat `thirdparty/metamod/CLAUDE.md` as this plugin's guide.
 
 ## Build
 

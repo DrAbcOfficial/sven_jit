@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(sven_jit VERSION 0.2.0 LANGUAGES C CXX)
+project(sven_jit VERSION 0.2.1 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -54,12 +54,24 @@ endif()
 message(STATUS "Configuring sven_jit for ${SVEN_JIT_METAMOD}")
 
 add_library(sven_jit SHARED
-    src/integration/game_engine_bridge.cpp
     src/jit/jit_service.cpp
     src/metamod/engine_exports.cpp
     src/metamod/game_api.cpp
     src/metamod/plugin_api.cpp
 )
+
+if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+    if(NOT EXISTS "${METAMOD_ROOT}/asext/include/asext_api.h")
+        message(FATAL_ERROR
+            "The asext API is unavailable at ${METAMOD_ROOT}/asext/include. "
+            "Initialize the metamod-fallguys submodule before configuring.")
+    endif()
+    target_sources(sven_jit PRIVATE
+        src/integration/asext_engine_bridge.cpp)
+elseif(SVEN_JIT_METAMOD STREQUAL "metamod-p")
+    target_sources(sven_jit PRIVATE
+        src/integration/game_engine_bridge.cpp)
+endif()
 
 if(WIN32)
     target_sources(sven_jit PRIVATE
@@ -91,6 +103,11 @@ target_include_directories(sven_jit PRIVATE
     "${METAMOD_ROOT}/metamod"
     "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/angelscript_jit_x86/third_party/angelscript/sdk/angelscript/include"
 )
+
+if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+    target_include_directories(sven_jit PRIVATE
+        "${METAMOD_ROOT}/asext/include")
+endif()
 
 target_link_libraries(sven_jit PRIVATE as_jit_x86 ${CMAKE_DL_LIBS})
 

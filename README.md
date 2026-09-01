@@ -3,9 +3,12 @@
 `sven_jit` is a 32-bit x86 Metamod plugin for Sven Co-op Dedicated Server. It
 connects Sven Co-op's AngelScript engine to the bundled
 [`angelscript_jit_x86`](https://github.com/DrAbcOfficial/angelscript_jit_x86)
-runtime before script modules are compiled. It discovers the loaded GameDLL
-from its function table and hooks AngelScript initialization directly; the
-runtime does not require the `asext` plugin or a hard-coded GameDLL module name.
+runtime before script modules are compiled.
+
+The metamod-fallguys build loads [`asext`](https://github.com/hzqst/metamod-fallguys)
+and installs the JIT from its documentation-init callback. The metamod-p build
+discovers the loaded GameDLL from its function table and hooks AngelScript
+initialization directly; it does not require `asext`.
 
 ## Requirements
 
@@ -15,9 +18,9 @@ runtime does not require the `asext` plugin or a hard-coded GameDLL module name.
 - The recursive `metamod-fallguys`, `metamod-p`, and `angelscript_jit_x86`
   submodules
 
-Only the Metamod SDK headers are used at build time. At runtime, engine
-discovery does not use Metamod's version-specific binary-analysis or
-inline-hook extensions.
+The metamod-fallguys build uses the `asext` headers at build time and loads
+`asext` at runtime. The metamod-p build uses only Metamod SDK headers and
+discovers the engine with its own signature and symbol scan.
 
 The build must target the Metamod implementation installed on the server.
 `SVEN_JIT_METAMOD` accepts `metamod-fallguys` (the default) or `metamod-p`.
@@ -131,10 +134,12 @@ Register the plugin in `svencoop/addons/metamod/plugins.ini`:
 linux addons/metamod/dlls/sven_jit.so
 ```
 
-Use the equivalent DLL path on Windows. A successful startup reports
-`AngelScript JIT enabled` in the Metamod log. Runtime loading and unloading are
-intentionally unsupported because AngelScript retains the JIT compiler for the
-life of its script engine.
+Use the equivalent DLL path on Windows. The metamod-fallguys build also
+requires `asext.dll` / `asext.so` in `addons/metamod/dlls`; `sven_jit` loads
+that plugin during attach. A successful startup reports `AngelScript JIT
+enabled` in the Metamod log. Runtime loading and unloading are intentionally
+unsupported because AngelScript retains the JIT compiler for the life of its
+script engine.
 
 ## License
 
