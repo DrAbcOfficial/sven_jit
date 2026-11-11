@@ -20,7 +20,7 @@ jobs:
       fail-fast: false
       matrix:
         metamod:
-          - metamod-fallguys
+          - metamod-svencoop
           - metamod-p
         simd:
           - label: SSE2
@@ -101,7 +101,7 @@ jobs:
       fail-fast: false
       matrix:
         metamod:
-          - metamod-fallguys
+          - metamod-svencoop
           - metamod-p
         simd:
           - label: SSE2
