@@ -5,7 +5,7 @@ connects Sven Co-op's AngelScript engine to the bundled
 [`angelscript_jit_x86`](https://github.com/DrAbcOfficial/angelscript_jit_x86)
 runtime before script modules are compiled.
 
-The metamod-fallguys build loads [`asext`](https://github.com/hzqst/metamod-fallguys)
+The metamod-svencoop build loads [`asext`](https://github.com/metamod-svencoop/metamod-svencoop)
 and installs the JIT from its documentation-init callback. The metamod-p build
 discovers the loaded GameDLL from its function table and hooks AngelScript
 initialization directly; it does not require `asext`.
@@ -15,15 +15,16 @@ initialization directly; it does not require `asext`.
 - CMake 3.24 or newer
 - A C++20 compiler with 32-bit x86 support
 - A Sven Co-op Dedicated Server installation
-- The recursive `metamod-fallguys`, `metamod-p`, and `angelscript_jit_x86`
+- The recursive `metamod-svencoop`, `metamod-p`, and `angelscript_jit_x86`
   submodules
 
-The metamod-fallguys build uses the `asext` headers at build time and loads
+The metamod-svencoop build uses the `asext` headers at build time and loads
 `asext` at runtime. The metamod-p build uses only Metamod SDK headers and
 discovers the engine with its own signature and symbol scan.
 
 The build must target the Metamod implementation installed on the server.
-`SVEN_JIT_METAMOD` accepts `metamod-fallguys` (the default) or `metamod-p`.
+`SVEN_JIT_METAMOD` accepts `metamod-svencoop` (the default), `metamod-p`, or
+the legacy alias `metamod-fallguys` for `metamod-svencoop`.
 Each output uses the selected SDK's exact `META_INTERFACE_VERSION`, so the two
 outputs are distributed separately and are not interchangeable.
 
@@ -66,7 +67,7 @@ cmake -S . -B build-win32 -A Win32
 cmake --build build-win32 --config Release
 ```
 
-The command above targets metamod-fallguys. To build for metamod-p, use a
+The command above targets metamod-svencoop. To build for metamod-p, use a
 separate build directory:
 
 ```text
@@ -95,7 +96,7 @@ cmake --build build-linux32 -j
 ```
 
 Add `-DSVEN_JIT_METAMOD=metamod-p` to target metamod-p, or leave the option at
-its default value to target metamod-fallguys. Add `-DSVEN_JIT_ENABLE_AVX2=ON`
+its default value to target metamod-svencoop. Add `-DSVEN_JIT_ENABLE_AVX2=ON`
 to configure an AVX2 build. Use separate build directories for every Metamod
 and instruction-set combination. CMake rejects 64-bit configurations.
 
@@ -125,7 +126,7 @@ Copy the matching output to `svencoop/addons/metamod/dlls`:
 - Linux: `sven_jit.so`
 
 Release archive names identify both the Metamod target (`metamod-p` or
-`metamod-fallguys`) and the instruction-set variant (`sse` or `sse-avx2`).
+`metamod-svencoop`) and the instruction-set variant (`sse` or `sse-avx2`).
 Install the archive matching the server's Metamod implementation.
 
 Register the plugin in `svencoop/addons/metamod/plugins.ini`:
@@ -134,7 +135,7 @@ Register the plugin in `svencoop/addons/metamod/plugins.ini`:
 linux addons/metamod/dlls/sven_jit.so
 ```
 
-Use the equivalent DLL path on Windows. The metamod-fallguys build also
+Use the equivalent DLL path on Windows. The metamod-svencoop build also
 requires `asext.dll` / `asext.so` in `addons/metamod/dlls`; `sven_jit` loads
 that plugin during attach. A successful startup reports `AngelScript JIT
 enabled` in the Metamod log. Runtime loading and unloading are intentionally

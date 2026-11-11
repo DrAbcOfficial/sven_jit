@@ -8,11 +8,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(SVEN_JIT_ENABLE_AVX2 "Enable the SSE2+AVX2 JIT variant" OFF)
-set(SVEN_JIT_METAMOD "metamod-fallguys" CACHE STRING
-    "Metamod SDK compatibility target (metamod-fallguys or metamod-p)")
+set(SVEN_JIT_METAMOD "metamod-svencoop" CACHE STRING
+    "Metamod SDK compatibility target (metamod-svencoop or metamod-p)")
 set_property(CACHE SVEN_JIT_METAMOD PROPERTY STRINGS
+    metamod-svencoop
     metamod-fallguys
     metamod-p)
+
+# metamod-fallguys is the legacy name of the metamod-svencoop SDK.
+if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+    set(SVEN_JIT_METAMOD_VARIANT "metamod-svencoop")
+else()
+    set(SVEN_JIT_METAMOD_VARIANT "${SVEN_JIT_METAMOD}")
+endif()
 
 if(NOT WIN32 AND NOT UNIX)
     message(FATAL_ERROR "sven_jit supports Windows and Linux only")
@@ -35,23 +43,25 @@ set(ASJITX86_ENABLE_SSE ON CACHE BOOL "" FORCE)
 set(ASJITX86_ENABLE_AVX2 ${SVEN_JIT_ENABLE_AVX2} CACHE BOOL "" FORCE)
 add_subdirectory(thirdparty/angelscript_jit_x86 EXCLUDE_FROM_ALL)
 
-if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+if(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-svencoop")
     set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod")
-elseif(SVEN_JIT_METAMOD STREQUAL "metamod-p")
+    set(METAMOD_API_HEADER "${METAMOD_ROOT}/metamod/include/meta_api.h")
+elseif(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-p")
     set(METAMOD_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/metamod-p")
+    set(METAMOD_API_HEADER "${METAMOD_ROOT}/metamod/meta_api.h")
 else()
     message(FATAL_ERROR
         "Unsupported SVEN_JIT_METAMOD value: ${SVEN_JIT_METAMOD}. "
-        "Expected metamod-fallguys or metamod-p.")
+        "Expected metamod-svencoop, metamod-fallguys or metamod-p.")
 endif()
 
-if(NOT EXISTS "${METAMOD_ROOT}/metamod/meta_api.h")
+if(NOT EXISTS "${METAMOD_API_HEADER}")
     message(FATAL_ERROR
-        "The ${SVEN_JIT_METAMOD} SDK is unavailable at ${METAMOD_ROOT}. "
+        "The ${SVEN_JIT_METAMOD_VARIANT} SDK is unavailable at ${METAMOD_ROOT}. "
         "Initialize the repository submodules before configuring.")
 endif()
 
-message(STATUS "Configuring sven_jit for ${SVEN_JIT_METAMOD}")
+message(STATUS "Configuring sven_jit for ${SVEN_JIT_METAMOD_VARIANT}")
 
 add_library(sven_jit SHARED
     src/jit/jit_service.cpp
@@ -60,15 +70,15 @@ add_library(sven_jit SHARED
     src/metamod/plugin_api.cpp
 )
 
-if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+if(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-svencoop")
     if(NOT EXISTS "${METAMOD_ROOT}/asext/include/asext_api.h")
         message(FATAL_ERROR
             "The asext API is unavailable at ${METAMOD_ROOT}/asext/include. "
-            "Initialize the metamod-fallguys submodule before configuring.")
+            "Initialize the metamod-svencoop submodules before configuring.")
     endif()
     target_sources(sven_jit PRIVATE
         src/integration/asext_engine_bridge.cpp)
-elseif(SVEN_JIT_METAMOD STREQUAL "metamod-p")
+elseif(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-p")
     target_sources(sven_jit PRIVATE
         src/integration/game_engine_bridge.cpp)
 endif()
@@ -96,17 +106,24 @@ endif()
 
 target_include_directories(sven_jit PRIVATE
     src
-    "${METAMOD_ROOT}/hlsdk/common"
-    "${METAMOD_ROOT}/hlsdk/dlls"
-    "${METAMOD_ROOT}/hlsdk/engine"
-    "${METAMOD_ROOT}/hlsdk/pm_shared"
-    "${METAMOD_ROOT}/metamod"
     "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/angelscript_jit_x86/third_party/angelscript/sdk/angelscript/include"
 )
 
-if(SVEN_JIT_METAMOD STREQUAL "metamod-fallguys")
+if(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-svencoop")
     target_include_directories(sven_jit PRIVATE
+        "${METAMOD_ROOT}/metamod/include/HLSDK/common"
+        "${METAMOD_ROOT}/metamod/include/HLSDK/dlls"
+        "${METAMOD_ROOT}/metamod/include/HLSDK/engine"
+        "${METAMOD_ROOT}/metamod/include/HLSDK/pm_shared"
+        "${METAMOD_ROOT}/metamod/include"
         "${METAMOD_ROOT}/asext/include")
+else()
+    target_include_directories(sven_jit PRIVATE
+        "${METAMOD_ROOT}/hlsdk/common"
+        "${METAMOD_ROOT}/hlsdk/dlls"
+        "${METAMOD_ROOT}/hlsdk/engine"
+        "${METAMOD_ROOT}/hlsdk/pm_shared"
+        "${METAMOD_ROOT}/metamod")
 endif()
 
 target_link_libraries(sven_jit PRIVATE as_jit_x86 ${CMAKE_DL_LIBS})
