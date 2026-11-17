@@ -142,6 +142,26 @@ enabled` in the Metamod log. Runtime loading and unloading are intentionally
 unsupported because AngelScript retains the JIT compiler for the life of its
 script engine.
 
+## Cvars
+
+### `as_line_callback`
+
+Default `0`. The GameDLL's AngelScript context pool registers the
+`CDebugger::LineCallback` debugger hook on every context request, and the hook
+runs on every executed script statement, costing most of the AngelScript
+execution time. `sven_jit` redirects the GameDLL's AngelScript request-context
+callback through its own hook and clears the line callback on each requested
+context, restoring full execution speed.
+
+Set `as_line_callback 1` to keep the debugger line callback registered, which
+is only needed when script debugging requires line numbers. The value is read
+every time the engine requests a context, so it can be toggled at runtime. The
+metamod-svencoop build installs the hook through metamod's metahook-style
+utilities (`pfnInlineHook`); the metamod-p build patches the GameDLL callback
+registration directly via a signature scan. Signatures are verified against
+the shipped Windows `server.dll` and Linux `server.so` from the same release;
+other GameDLL builds fall back to the vanilla behavior with a logged warning.
+
 ## License
 
 This project is licensed under the GNU General Public License version 3. See

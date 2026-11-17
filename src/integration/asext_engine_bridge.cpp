@@ -2,6 +2,8 @@
 
 #include "metamod/hlsdk.hpp"
 
+#include "integration/line_callback_patch.hpp"
+
 #include "asext_api.h"
 
 fnASEXT_RegisterDocInitCallback ASEXT_RegisterDocInitCallback = nullptr;
@@ -46,10 +48,14 @@ bool ImportAsext(void* asextHandle) noexcept {
 }
 
 const char* ConnectGameEngine(
-    void*,
+    void* gameFunctions,
     EngineReadyCallback callback) noexcept {
-    if (!callback) {
+    if (!gameFunctions || !callback) {
         return "invalid game engine integration arguments";
+    }
+
+    if (const char* patchError = ConnectLineCallbackPatch(gameFunctions)) {
+        LOG_ERROR(PLID, "%s", patchError);
     }
 
     void* asextHandle = nullptr;
@@ -79,6 +85,7 @@ const char* ConnectGameEngine(
 }
 
 void DisconnectGameEngine() noexcept {
+    DisconnectLineCallbackPatch();
     g_engineReadyCallback = nullptr;
 }
 

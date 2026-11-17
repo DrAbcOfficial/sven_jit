@@ -10,6 +10,8 @@
 - `src/` — plugin only (`metamod/`, `integration/`, `jit/`).
 - `src/integration/asext_engine_bridge.cpp` — metamod-svencoop + asext.
 - `src/integration/game_engine_bridge.cpp` — metamod-p signature scan.
+- `src/integration/module_scan.cpp` — GameDLL anchor/pattern-scan/memory-patch helpers (metamod-p builds only).
+- `src/integration/line_callback_patch.cpp` — `as_line_callback` cvar + request-context hook.
 - `thirdparty/metamod/` — metamod-svencoop (default).
 - `thirdparty/metamod-p/` — metamod-p.
 - `thirdparty/angelscript_jit_x86/` — pinned JIT submodule. Do not vendor a second copy or commit files inside it.
@@ -58,3 +60,5 @@ Add `-DASJITX86_ENABLE_AVX2=ON` and another build dir when SIMD emit changes.
 - Keep SSE2 vs AVX2 paths explicit.
 - `Meta_Query` takes `char*` on metamod-p, `const char*` on metamod-svencoop.
 - Engine-ready marker is `RegisterObjectType` of `CSurvivalMode` / `"Survival Mode handler"` / flags `0x40001`.
+- `as_line_callback` (default `0`) is enforced by hooking the GameDLL's `ASRequestContext` (`kSetContextCallbacksSignature` / `kRequestContextWrapperSignature` in `src/integration/line_callback_patch.cpp`, verified against server.dll `0x100a18b6` and server.so `0x125b8d`/`0x17ea9e`). metamod-svencoop hooks it through its metahook-style mutil APIs (`pfnSearchPattern`/`pfnInlineHook`); metamod-p's mutil table has no hook extensions, so its build patches the registration `push imm32` (Windows) or the wrapper's tail-jump `rel32` (Linux) directly. A failed scan logs a warning and leaves the vanilla callback; it must not fail plugin load.
+- metamod-p's `extdll.h` defines `min`/`max` macros and its include chain pulls C++ stdlib headers; `src/metamod/hlsdk.hpp` pre-parses the affected stdlib headers first on metamod-p Linux (breaks on GCC 14 otherwise).

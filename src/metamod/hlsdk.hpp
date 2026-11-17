@@ -6,6 +6,17 @@
 #undef _DEBUG
 #endif
 
+#if defined(SVEN_JIT_METAMOD_P) && !defined(_WIN32)
+// The SDK's extdll.h defines min/max macros and then pulls in C++ standard
+// headers through its own includes; parse the affected stdlib headers first
+// so they never see the macros.
+#include <algorithm>
+#include <cmath>
+#include <limits>
+#include <string>
+#include <vector>
+#endif
+
 #include <extdll.h>
 #include <dllapi.h>
 #include <meta_api.h>

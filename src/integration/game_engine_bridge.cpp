@@ -8,40 +8,17 @@
 #include <cstring>
 #include <vector>
 
-#ifdef _WIN32
-#include <Windows.h>
-#else
+#include "integration/line_callback_patch.hpp"
+#include "integration/module_scan.hpp"
+
+#ifndef _WIN32
 #include <dlfcn.h>
-#include <link.h>
-#include <sys/mman.h>
-#include <unistd.h>
 #endif
 
 namespace svenjit::integration {
 namespace {
 
-constexpr std::uint8_t kWildcard = 0x2A;
 constexpr std::size_t kServerManagerEngineOffset = 12;
-
-struct MemoryRange {
-    std::uint8_t* begin;
-    std::size_t size;
-};
-
-struct ModuleView {
-    std::vector<MemoryRange> executableRanges;
-
-    bool ContainsExecutable(const void* address) const noexcept {
-        const auto value = reinterpret_cast<std::uintptr_t>(address);
-        for (const MemoryRange& range : executableRanges) {
-            const auto begin = reinterpret_cast<std::uintptr_t>(range.begin);
-            if (value >= begin && value < begin + range.size) {
-                return true;
-            }
-        }
-        return false;
-    }
-};
 
 struct CallPatch {
     std::uint8_t* address;
@@ -115,38 +92,6 @@ constexpr const char* kRegisterObjectTypeSymbol =
     "_ZN16CASDocumentation18RegisterObjectTypeEPKcS1_im";
 #endif
 
-bool MatchesPattern(
-    const std::uint8_t* address,
-    const std::uint8_t* pattern,
-    std::size_t patternSize) noexcept {
-    for (std::size_t index = 0; index < patternSize; ++index) {
-        if (pattern[index] != kWildcard && address[index] != pattern[index]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-std::vector<std::uint8_t*> FindPattern(
-    const ModuleView& module,
-    const std::uint8_t* pattern,
-    std::size_t patternSize) {
-    std::vector<std::uint8_t*> matches;
-    for (const MemoryRange& range : module.executableRanges) {
-        if (range.size < patternSize) {
-            continue;
-        }
-        const std::size_t last = range.size - patternSize;
-        for (std::size_t offset = 0; offset <= last; ++offset) {
-            std::uint8_t* candidate = range.begin + offset;
-            if (MatchesPattern(candidate, pattern, patternSize)) {
-                matches.push_back(candidate);
-            }
-        }
-    }
-    return matches;
-}
-
 void* ResolveRelativeCall(const std::uint8_t* call) noexcept {
     if (!call || call[0] != 0xE8) {
         return nullptr;
@@ -160,87 +105,14 @@ bool WriteRelativeCall(std::uint8_t* call, void* destination) noexcept {
     const auto sourceAfterCall = reinterpret_cast<std::uintptr_t>(call + 5);
     const auto target = reinterpret_cast<std::uintptr_t>(destination);
     const auto displacement = static_cast<std::uint32_t>(target - sourceAfterCall);
-
-#ifdef _WIN32
-    DWORD oldProtection = 0;
-    if (!VirtualProtect(call, 5, PAGE_EXECUTE_READWRITE, &oldProtection)) {
-        return false;
-    }
-#else
-    const long pageSize = sysconf(_SC_PAGESIZE);
-    if (pageSize <= 0) {
-        return false;
-    }
-    const auto pageMask = static_cast<std::uintptr_t>(pageSize - 1);
-    const auto begin = reinterpret_cast<std::uintptr_t>(call) & ~pageMask;
-    const auto end = (reinterpret_cast<std::uintptr_t>(call + 5) + pageMask) & ~pageMask;
-    if (mprotect(
-            reinterpret_cast<void*>(begin),
-            end - begin,
-            PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
-        return false;
-    }
-#endif
-
-    call[0] = 0xE8;
-    std::memcpy(call + 1, &displacement, sizeof(displacement));
-
-#ifdef _WIN32
-    FlushInstructionCache(GetCurrentProcess(), call, 5);
-    DWORD ignored = 0;
-    VirtualProtect(call, 5, oldProtection, &ignored);
-#else
-    __builtin___clear_cache(
-        reinterpret_cast<char*>(call),
-        reinterpret_cast<char*>(call + 5));
-    mprotect(
-        reinterpret_cast<void*>(begin),
-        end - begin,
-        PROT_READ | PROT_EXEC);
-#endif
-    return true;
+    return WriteExecutableMemory(call + 1, &displacement, sizeof(displacement));
 }
 
 bool RestoreCall(const CallPatch& patch) noexcept {
-#ifdef _WIN32
-    DWORD oldProtection = 0;
-    if (!VirtualProtect(patch.address, patch.original.size(), PAGE_EXECUTE_READWRITE, &oldProtection)) {
-        return false;
-    }
-#else
-    const long pageSize = sysconf(_SC_PAGESIZE);
-    if (pageSize <= 0) {
-        return false;
-    }
-    const auto pageMask = static_cast<std::uintptr_t>(pageSize - 1);
-    const auto begin = reinterpret_cast<std::uintptr_t>(patch.address) & ~pageMask;
-    const auto end =
-        (reinterpret_cast<std::uintptr_t>(patch.address + patch.original.size()) + pageMask) &
-        ~pageMask;
-    if (mprotect(
-            reinterpret_cast<void*>(begin),
-            end - begin,
-            PROT_READ | PROT_WRITE | PROT_EXEC) != 0) {
-        return false;
-    }
-#endif
-
-    std::memcpy(patch.address, patch.original.data(), patch.original.size());
-
-#ifdef _WIN32
-    FlushInstructionCache(GetCurrentProcess(), patch.address, patch.original.size());
-    DWORD ignored = 0;
-    VirtualProtect(patch.address, patch.original.size(), oldProtection, &ignored);
-#else
-    __builtin___clear_cache(
-        reinterpret_cast<char*>(patch.address),
-        reinterpret_cast<char*>(patch.address + patch.original.size()));
-    mprotect(
-        reinterpret_cast<void*>(begin),
-        end - begin,
-        PROT_READ | PROT_EXEC);
-#endif
-    return true;
+    return WriteExecutableMemory(
+        patch.address,
+        patch.original.data(),
+        patch.original.size());
 }
 
 void RemoveCallPatches() noexcept {
@@ -309,104 +181,19 @@ int SC_SERVER_DECL HookedRegisterObjectType(
         flags);
 }
 
-void* FindGameDllAnchor(gamedll_funcs_t* gameFunctions) noexcept {
-    if (!gameFunctions || !gameFunctions->dllapi_table) {
-        return nullptr;
-    }
-
-    DLL_FUNCTIONS* functions = gameFunctions->dllapi_table;
-    const std::array<void*, 4> candidates = {
-        reinterpret_cast<void*>(functions->pfnGameInit),
-        reinterpret_cast<void*>(functions->pfnSpawn),
-        reinterpret_cast<void*>(functions->pfnServerActivate),
-        reinterpret_cast<void*>(functions->pfnStartFrame),
-    };
-    for (void* candidate : candidates) {
-        if (candidate) {
-            return candidate;
-        }
-    }
-    return nullptr;
-}
-
 #ifdef _WIN32
-bool BuildModuleView(void* anchor, ModuleView& module) {
-    MEMORY_BASIC_INFORMATION memory{};
-    if (!VirtualQuery(anchor, &memory, sizeof(memory)) || !memory.AllocationBase) {
+bool LocateServerManager(const ModuleView& module) {
+    const auto matches = FindPattern(
+        module,
+        kServerManagerSignature,
+        sizeof(kServerManagerSignature));
+    if (matches.size() != 1) {
         return false;
     }
-
-    auto* base = static_cast<std::uint8_t*>(memory.AllocationBase);
-    auto* dos = reinterpret_cast<IMAGE_DOS_HEADER*>(base);
-    if (dos->e_magic != IMAGE_DOS_SIGNATURE) {
-        return false;
-    }
-    auto* nt = reinterpret_cast<IMAGE_NT_HEADERS*>(base + dos->e_lfanew);
-    if (nt->Signature != IMAGE_NT_SIGNATURE) {
-        return false;
-    }
-
-    const IMAGE_SECTION_HEADER* section = IMAGE_FIRST_SECTION(nt);
-    for (unsigned int index = 0; index < nt->FileHeader.NumberOfSections; ++index) {
-        if ((section[index].Characteristics & IMAGE_SCN_MEM_EXECUTE) == 0) {
-            continue;
-        }
-        const std::size_t size = section[index].Misc.VirtualSize;
-        if (size != 0) {
-            module.executableRanges.push_back({base + section[index].VirtualAddress, size});
-        }
-    }
-    return !module.executableRanges.empty() && module.ContainsExecutable(anchor);
+    std::memcpy(&g_serverManager, matches.front() + 5, sizeof(g_serverManager));
+    return g_serverManager != nullptr;
 }
 #else
-struct ModuleSearchContext {
-    std::uintptr_t anchor;
-    ModuleView* module;
-    const char* path;
-};
-
-int FindContainingModule(dl_phdr_info* info, std::size_t, void* data) {
-    auto* context = static_cast<ModuleSearchContext*>(data);
-    bool containsAnchor = false;
-    for (ElfW(Half) index = 0; index < info->dlpi_phnum; ++index) {
-        const ElfW(Phdr)& header = info->dlpi_phdr[index];
-        if (header.p_type != PT_LOAD) {
-            continue;
-        }
-        const auto begin = static_cast<std::uintptr_t>(info->dlpi_addr + header.p_vaddr);
-        if (context->anchor >= begin && context->anchor < begin + header.p_memsz) {
-            containsAnchor = true;
-            break;
-        }
-    }
-    if (!containsAnchor) {
-        return 0;
-    }
-
-    for (ElfW(Half) index = 0; index < info->dlpi_phnum; ++index) {
-        const ElfW(Phdr)& header = info->dlpi_phdr[index];
-        if (header.p_type == PT_LOAD && (header.p_flags & PF_X) != 0 && header.p_memsz != 0) {
-            context->module->executableRanges.push_back({
-                reinterpret_cast<std::uint8_t*>(info->dlpi_addr + header.p_vaddr),
-                static_cast<std::size_t>(header.p_memsz),
-            });
-        }
-    }
-    context->path = info->dlpi_name;
-    return 1;
-}
-
-bool BuildModuleView(void* anchor, ModuleView& module, const char*& modulePath) {
-    ModuleSearchContext context{
-        reinterpret_cast<std::uintptr_t>(anchor),
-        &module,
-        nullptr,
-    };
-    dl_iterate_phdr(&FindContainingModule, &context);
-    modulePath = context.path;
-    return !module.executableRanges.empty() && module.ContainsExecutable(anchor);
-}
-
 void* FindSymbol(const char* modulePath, const char* symbol) noexcept {
     if (!modulePath || !*modulePath) {
         return nullptr;
@@ -419,25 +206,8 @@ void* FindSymbol(const char* modulePath, const char* symbol) noexcept {
     dlclose(handle);
     return address;
 }
-#endif
 
-bool LocateServerManager(
-    const ModuleView& module
-#ifndef _WIN32
-    , const char* modulePath
-#endif
-) {
-#ifdef _WIN32
-    const auto matches = FindPattern(
-        module,
-        kServerManagerSignature,
-        sizeof(kServerManagerSignature));
-    if (matches.size() != 1) {
-        return false;
-    }
-    std::memcpy(&g_serverManager, matches.front() + 5, sizeof(g_serverManager));
-    return g_serverManager != nullptr;
-#else
+bool LocateServerManager(const ModuleView& module, const char* modulePath) {
     g_serverManager = static_cast<CASServerManager**>(
         FindSymbol(modulePath, kServerManagerSymbol));
     if (g_serverManager) {
@@ -464,8 +234,8 @@ bool LocateServerManager(
     g_serverManager = reinterpret_cast<CASServerManager**>(
         globalOffsetTable + managerDisplacement);
     return g_serverManager != nullptr;
-#endif
 }
+#endif
 
 std::vector<std::uint8_t*> FindDirectCallsTo(
     const ModuleView& module,
@@ -541,6 +311,10 @@ const char* ConnectGameEngine(
         return "invalid game engine integration arguments";
     }
 
+    if (const char* patchError = ConnectLineCallbackPatch(gameFunctions)) {
+        LOG_ERROR(PLID, "%s", patchError);
+    }
+
     auto* functions = static_cast<gamedll_funcs_t*>(gameFunctions);
     void* anchor = FindGameDllAnchor(functions);
     if (!anchor) {
@@ -552,7 +326,7 @@ const char* ConnectGameEngine(
     if (!BuildModuleView(anchor, module)) {
 #else
     const char* modulePath = nullptr;
-    if (!BuildModuleView(anchor, module, modulePath)) {
+    if (!BuildModuleView(anchor, module, &modulePath)) {
 #endif
         return "failed to identify the GameDLL image";
     }
@@ -599,6 +373,7 @@ const char* ConnectGameEngine(
 
 void DisconnectGameEngine() noexcept {
     RemoveCallPatches();
+    DisconnectLineCallbackPatch();
     g_engineReadyCallback = nullptr;
     g_registerObjectType = nullptr;
     g_serverManager = nullptr;

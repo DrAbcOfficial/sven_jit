@@ -65,6 +65,7 @@ message(STATUS "Configuring sven_jit for ${SVEN_JIT_METAMOD_VARIANT}")
 
 add_library(sven_jit SHARED
     src/jit/jit_service.cpp
+    src/integration/line_callback_patch.cpp
     src/metamod/engine_exports.cpp
     src/metamod/game_api.cpp
     src/metamod/plugin_api.cpp
@@ -80,7 +81,8 @@ if(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-svencoop")
         src/integration/asext_engine_bridge.cpp)
 elseif(SVEN_JIT_METAMOD_VARIANT STREQUAL "metamod-p")
     target_sources(sven_jit PRIVATE
-        src/integration/game_engine_bridge.cpp)
+        src/integration/game_engine_bridge.cpp
+        src/integration/module_scan.cpp)
 endif()
 
 if(WIN32)
